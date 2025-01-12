@@ -2,103 +2,143 @@
 
 # API Security Checklist
 
-Checklist of the most important security countermeasures when designing, testing, and releasing your API.
+A comprehensive checklist for implementing security best practices in modern API development. This checklist helps you build and maintain secure APIs by following industry standards and best practices.
 
 ---
 
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Access Control](#access-control)
+- [Input Validation & Processing](#input-validation--processing)
+- [Output Security](#output-security)
+- [Infrastructure Security](#infrastructure-security)
+- [Modern Security Considerations](#modern-security-considerations)
+- [DevSecOps](#devsecops)
+- [Monitoring & Response](#monitoring--response)
+- [Contributing](#contributing)
+
 ## Authentication
 
-- [ ] Don't use `Basic Auth`. Use modern authentication standards (e.g., [JWT](https://jwt.io/), [OAuth 2.0](https://oauth.net/2/), [OpenID Connect](https://openid.net/connect/)).
-- [ ] Don't reinvent the wheel in `Authentication`, `token generation`, `password storage`. Use established standards and libraries.
-- [ ] Use `Max Retry` with exponential backoff and account lockout policies in Login.
-- [ ] Use strong encryption (AES-256 or better) for sensitive data at rest and in transit.
-- [ ] Implement MFA (Multi-Factor Authentication) for enhanced security.
-- [ ] Use secure session management with proper timeout and renewal mechanisms.
+### Core Authentication
+- [ ] Don't use `Basic Auth`. Use modern authentication standards (OAuth 2.1+, [JWT](https://jwt.io/), [PASETO](https://paseto.io/)).
+- [ ] Support passwordless authentication (WebAuthn, FIDO2) where applicable.
+- [ ] Enforce Multi-Factor Authentication (MFA) for sensitive operations.
+- [ ] Use secure password hashing (Argon2id, bcrypt) with appropriate work factors.
+- [ ] Implement automated key rotation and secure key management.
+- [ ] Use environment-specific API keys with proper scope limitations.
+- [ ] Enable rate limiting with exponential backoff on authentication endpoints.
+- [ ] Configure secure session management with proper timeout and renewal.
 
-### JWT (JSON Web Token)
-
-- [ ] Use a cryptographically secure random key (`JWT Secret`) with sufficient length (at least 256 bits).
-- [ ] Don't extract the algorithm from the header. Force the algorithm in the backend (`HS256`, `RS256`, or `EdDSA`).
-- [ ] Make token expiration (`TTL`, `RTTL`) as short as possible and implement proper token rotation.
-- [ ] Don't store sensitive data in the JWT payload, it can be decoded [easily](https://jwt.io/#debugger-io).
-- [ ] Avoid storing too much data. JWT is usually shared in headers and they have a size limit.
+### JWT Security
+- [ ] Use cryptographically secure algorithms (EdDSA, ES256, RS256).
+- [ ] Implement JWK rotation and proper key management.
+- [ ] Use encrypted JWTs (JWE) for sensitive payload data.
+- [ ] Make token expiration (`TTL`) as short as possible.
+- [ ] Implement proper token validation and revocation.
+- [ ] Don't store sensitive data in JWT payload.
 - [ ] Store token hashes in a blocklist for revoked tokens.
 
-## Access
+## Access Control
 
-- [ ] Implement rate limiting with dynamic thresholds to prevent DDoS / brute-force attacks.
-- [ ] Use HTTPS with TLS 1.3 and secure ciphers, disable older versions to prevent downgrade attacks.
-- [ ] Use `HSTS` header with proper configuration and preload flag when possible.
-- [ ] Turn off directory listings and implement proper routing.
-- [ ] For private APIs, implement IP whitelisting and use mutual TLS (mTLS) when possible.
-- [ ] Implement proper CORS policies with specific origins rather than wildcards.
+### Authentication & Authorization
+- [ ] Implement Role-Based Access Control (RBAC) with principle of least privilege.
+- [ ] Use Attribute-Based Access Control (ABAC) for complex permissions.
+- [ ] Validate `redirect_uri` server-side against a whitelist.
+- [ ] Implement proper scope validation for OAuth 2.0/OpenID Connect.
+- [ ] Use resource-based URLs (e.g., `/me/orders` instead of `/user/654321/orders`).
+- [ ] For private APIs, implement IP whitelisting and mutual TLS (mTLS).
 
-## Authorization
+### Network Security
+- [ ] Use HTTPS with TLS 1.3, disable older versions.
+- [ ] Enable `HSTS` header with proper configuration and preload.
+- [ ] Implement proper CORS policies with specific origins.
+- [ ] Deploy Web Application Firewall (WAF) rules.
+- [ ] Use API gateway for rate limiting and security controls.
 
-### OAuth 2.0 & OpenID Connect
+## Input Validation & Processing
 
-- [ ] Always validate `redirect_uri` server-side against a whitelist of allowed URLs.
-- [ ] Prefer authorization code flow with PKCE over implicit flow.
-- [ ] Use `state` parameter with a secure random value to prevent CSRF on the OAuth authorization process.
-- [ ] Define and enforce scope boundaries, validate scope parameters for each application.
-- [ ] Implement proper token validation and handle token revocation.
-- [ ] Use short-lived access tokens and secure refresh token rotation.
+### Request Security
+- [ ] Validate `content-type` headers strictly.
+- [ ] Sanitize and validate all input parameters.
+- [ ] Use parameterized queries to prevent injection attacks.
+- [ ] Protect against common vulnerabilities (XSS, SQL Injection, NoSQL Injection, XXE).
+- [ ] Implement proper file upload validation and scanning.
+- [ ] Use appropriate HTTP methods and return proper status codes.
+- [ ] Never expose sensitive data in URLs.
 
-## Input
-
-- [ ] Use the proper HTTP method according to the operation: `GET (read)`, `POST (create)`, `PUT/PATCH (replace/update)`, and `DELETE (to delete a record)`, and respond with `405 Method Not Allowed` if the requested method isn't appropriate for the requested resource.
-- [ ] Validate `content-type` on request Accept header (Content Negotiation) to allow only your supported format (e.g., `application/xml`, `application/json`, etc.) and respond with `406 Not Acceptable` response if not matched.
-- [ ] Validate `content-type` of posted data as you accept (e.g., `application/x-www-form-urlencoded`, `multipart/form-data`, `application/json`, etc.).
-- [ ] Validate user input to avoid common vulnerabilities (e.g., `XSS`, `SQL-Injection`, `Remote Code Execution`, `NoSQL Injection`, etc.).
-- [ ] Don't use any sensitive data (`credentials`, `Passwords`, `security tokens`, or `API keys`) in the URL, but use standard Authorization header.
-- [ ] Use server-side encryption with modern algorithms (AES-256-GCM, ChaCha20-Poly1305).
-- [ ] Use an API Gateway service to enable caching, Rate Limit policies (e.g., `Quota`, `Spike Arrest`, `Concurrent Rate Limit`) and deploy APIs resources dynamically.
-- [ ] Implement proper input sanitization and validation for all API parameters.
-
-## Processing
-
-- [ ] Verify all endpoints are protected by appropriate authentication and authorization mechanisms.
-- [ ] Use resource-based URLs. Prefer `/me/orders` instead of `/user/654321/orders`.
-- [ ] Use UUIDs or other non-sequential identifiers to prevent enumeration attacks.
-- [ ] For XML processing, disable entity parsing to prevent `XXE` (XML external entity attack).
-- [ ] For parsers (XML, YAML, JSON, etc.), disable entity expansion to prevent `Billion Laughs/XML bomb` attacks.
-- [ ] Use cloud storage services or CDNs for file uploads with proper access controls.
-- [ ] For heavy operations, use async processing with Workers and Message Queues.
+### Processing Security
+- [ ] Disable entity parsing in XML/YAML to prevent XXE attacks.
+- [ ] Prevent Billion Laughs/XML bomb attacks in parsers.
+- [ ] Use cloud storage with proper access controls for uploads.
+- [ ] Implement async processing for heavy operations.
 - [ ] Ensure DEBUG mode is disabled in production.
-- [ ] Enable security headers and use secure configurations.
-- [ ] Implement proper error handling without exposing sensitive details.
+- [ ] Handle errors without exposing sensitive details.
 
-## Output
+## Output Security
 
-- [ ] Send `X-Content-Type-Options: nosniff` header.
-- [ ] Send `X-Frame-Options: deny` header.
-- [ ] Send `Content-Security-Policy` header with strict policies.
-- [ ] Remove fingerprinting headers - `X-Powered-By`, `Server`, `X-AspNet-Version`, etc.
-- [ ] Force `content-type` for your response with proper charset.
-- [ ] Don't return sensitive data like `credentials`, `passwords`, or `security tokens`.
-- [ ] Return the proper status code according to the operation completed. (e.g., `200 OK`, `400 Bad Request`, `401 Unauthorized`, `405 Method Not Allowed`, etc.).
-- [ ] Implement proper JSON serialization with security in mind.
+### Response Headers
+- [ ] Set `X-Content-Type-Options: nosniff`
+- [ ] Set `X-Frame-Options: deny`
+- [ ] Configure strict Content Security Policy (CSP)
+- [ ] Remove fingerprinting headers
+- [ ] Set proper CORS headers
+- [ ] Implement proper caching headers
 
-## CI & CD
+### Response Content
+- [ ] Force `content-type` with proper charset
+- [ ] Never return sensitive data
+- [ ] Use proper HTTP status codes
+- [ ] Implement secure JSON serialization
+- [ ] Validate and sanitize all output
 
-- [ ] Implement comprehensive unit/integration tests with high coverage.
-- [ ] Use automated code review tools and security scanners.
-- [ ] Ensure all components are scanned for vulnerabilities before deployment.
-- [ ] Run automated security tests (SAST/DAST) in your pipeline.
-- [ ] Use dependency scanning and keep dependencies updated.
-- [ ] Implement blue-green deployments or canary releases.
-- [ ] Use infrastructure as code with security policies.
-- [ ] Implement proper secrets management.
+## Infrastructure Security
 
-## Monitoring
+### Core Infrastructure
+- [ ] Implement comprehensive container security
+- [ ] Use secrets management solutions
+- [ ] Enable infrastructure as code security
+- [ ] Configure proper backup and recovery
+- [ ] Implement network segmentation
+- [ ] Use secure service mesh
+- [ ] Enable cloud security controls
+- [ ] Protect edge computing endpoints
 
-- [ ] Implement centralized logging with proper log levels and encryption.
-- [ ] Use APM (Application Performance Monitoring) tools for traffic analysis.
-- [ ] Configure alerts for suspicious activities across multiple channels.
-- [ ] Ensure compliance with data privacy regulations in logging.
-- [ ] Use SIEM systems for security monitoring and threat detection.
-- [ ] Implement proper audit logging for security events.
-- [ ] Use real-time monitoring and alerting for critical security events.
+## Modern Security Considerations
+
+### Modern Architectures
+- [ ] Secure GraphQL implementations
+- [ ] Protect WebSocket connections
+- [ ] Secure gRPC services
+- [ ] Implement serverless security
+- [ ] Configure Kubernetes security
+- [ ] Enable zero-trust architecture
+- [ ] Protect microservices communication
+- [ ] Secure API gateway integration
+
+## DevSecOps
+
+### Security Pipeline
+- [ ] Run automated security tests (SAST/DAST)
+- [ ] Implement dependency scanning
+- [ ] Enable container scanning
+- [ ] Use automated code review
+- [ ] Implement secure CI/CD
+- [ ] Enable infrastructure scanning
+- [ ] Use blue-green deployments
+- [ ] Implement proper secrets rotation
+
+## Monitoring & Response
+
+### Security Monitoring
+- [ ] Implement centralized logging with encryption
+- [ ] Use APM tools for traffic analysis
+- [ ] Enable real-time security alerts
+- [ ] Implement audit logging
+- [ ] Use SIEM for threat detection
+- [ ] Enable anomaly detection
+- [ ] Configure compliance monitoring
+- [ ] Implement incident response
 
 ---
 
@@ -106,8 +146,6 @@ Checklist of the most important security countermeasures when designing, testing
 
 - [yosriady/api-development-tools](https://github.com/yosriady/api-development-tools) - A collection of useful resources for building RESTful HTTP+JSON APIs.
 
----
+## Contributing
 
-# Contribution
-
-Feel free to contribute by forking this repository, making some changes, and submitting pull requests. For any questions drop us an email at `team@shieldfy.io`.
+Feel free to contribute by forking this repository, making changes, and submitting pull requests. For questions or suggestions, please open an issue or contact us at `team@shieldfy.io`.
